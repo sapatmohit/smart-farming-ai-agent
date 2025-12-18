@@ -1,10 +1,10 @@
 use serde_json::json;
 use reqwest::Client;
 use std::env;
-use tracing::{info, error};
+use tracing::{info, error, warn};
 
-/// IBM Granite LLM integration for Smart Farming AI Agent
-/// Uses IBM WatsonX AI API for text generation
+/// IBM Granite LLM integration via Replicate API
+/// Uses Replicate's hosted IBM Granite models for text generation
 
 const SYSTEM_PROMPT: &str = r#"You are an expert agricultural advisor helping Indian farmers with accurate, localized, and practical advice.
 
@@ -22,16 +22,16 @@ FORMAT:
 - Include specific quantities and timings when available
 - Mention local names of crops/pests when relevant"#;
 
+const REPLICATE_API_URL: &str = "https://api.replicate.com/v1/predictions";
+
 pub async fn generate_response(query: &str, context: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let api_key = env::var("IBM_CLOUD_API_KEY").map_err(|_| "IBM_CLOUD_API_KEY not set")?;
-    let project_id = env::var("IBM_PROJECT_ID").map_err(|_| "IBM_PROJECT_ID not set")?;
-    let model_id = env::var("IBM_GRANITE_MODEL_ID").unwrap_or_else(|_| "ibm/granite-13b-chat-v2".to_string());
-    let region = env::var("IBM_REGION").unwrap_or_else(|_| "us-south".to_string());
+    let api_token = env::var("REPLICATE_API_TOKEN").map_err(|_| "REPLICATE_API_TOKEN not set")?;
     
-    let url = format!("https://{}.ml.cloud.ibm.com/ml/v1/text/generation?version=2023-05-29", region);
+    // Use IBM Granite 3.0 8B Instruct model on Replicate
+    let model_version = env::var("REPLICATE_MODEL_VERSION")
+        .unwrap_or_else(|_| "ibm-granite/granite-3.0-8b-instruct".to_string());
 
     let client = Client::new();
-    let token = super::ibm_cloud::get_iam_token(&api_key).await?;
 
     // Build the prompt with context
     let user_prompt = if context.is_empty() {
@@ -43,66 +43,131 @@ pub async fn generate_response(query: &str, context: &str) -> Result<String, Box
         )
     };
 
+    let full_prompt = format!("{}\n\nUser: {}\nAssistant:", SYSTEM_PROMPT, user_prompt);
+
+    info!("Calling Replicate API with IBM Granite model");
+
+    // Create prediction request
     let body = json!({
-        "model_id": model_id,
-        "project_id": project_id,
-        "input": format!("{}\n\nUser: {}\nAssistant:", SYSTEM_PROMPT, user_prompt),
-        "parameters": {
-            "decoding_method": "greedy",
-            "max_new_tokens": 500,
-            "min_new_tokens": 50,
-            "stop_sequences": ["User:", "\n\nUser"],
-            "repetition_penalty": 1.1,
-            "temperature": 0.7
+        "version": model_version,
+        "input": {
+            "prompt": full_prompt,
+            "max_tokens": 500,
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "stop_sequences": "User:,\n\nUser"
         }
     });
 
-    info!("Calling IBM Granite API with model: {}", model_id);
-
-    let res = client.post(&url)
-        .header("Authorization", format!("Bearer {}", token))
+    let res = client.post(REPLICATE_API_URL)
+        .header("Authorization", format!("Bearer {}", api_token))
         .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
+        .header("Prefer", "wait")  // Wait for result synchronously
         .json(&body)
         .send()
         .await?;
 
-    if res.status().is_success() {
+    if res.status().is_success() || res.status().as_u16() == 201 {
         let json_resp: serde_json::Value = res.json().await?;
         
-        // Parse the response structure
-        let generated_text = json_resp["results"]
-            .get(0)
-            .and_then(|r| r["generated_text"].as_str())
-            .unwrap_or("I apologize, but I couldn't generate a response. Please try again.")
-            .trim()
-            .to_string();
+        // Check if prediction is completed
+        let status = json_resp["status"].as_str().unwrap_or("unknown");
+        
+        if status == "succeeded" {
+            // Get the output
+            let output = if let Some(output_array) = json_resp["output"].as_array() {
+                output_array.iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<&str>>()
+                    .join("")
+            } else if let Some(output_str) = json_resp["output"].as_str() {
+                output_str.to_string()
+            } else {
+                return Ok(get_fallback_response(query, context));
+            };
 
-        info!("Successfully generated response ({} chars)", generated_text.len());
-        Ok(generated_text)
+            info!("Successfully generated response ({} chars)", output.len());
+            Ok(output.trim().to_string())
+        } else if status == "processing" || status == "starting" {
+            // Need to poll for result
+            if let Some(get_url) = json_resp["urls"]["get"].as_str() {
+                poll_for_result(&client, get_url, &api_token).await
+            } else {
+                warn!("No polling URL available, using fallback");
+                Ok(get_fallback_response(query, context))
+            }
+        } else {
+            warn!("Prediction failed with status: {}", status);
+            Ok(get_fallback_response(query, context))
+        }
     } else {
         let status = res.status();
         let error_text = res.text().await.unwrap_or_default();
-        error!("IBM Granite API Error ({}): {}", status, error_text);
-        Err(format!("IBM API Error: {} - {}", status, error_text).into())
+        error!("Replicate API Error ({}): {}", status, error_text);
+        
+        // Return fallback response instead of error
+        Ok(get_fallback_response(query, context))
     }
 }
 
-/// Fallback response when IBM API is not available
+/// Poll Replicate API for prediction result
+async fn poll_for_result(client: &Client, url: &str, api_token: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    for attempt in 0..30 {  // Max 30 attempts (30 seconds)
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        
+        let res = client.get(url)
+            .header("Authorization", format!("Bearer {}", api_token))
+            .send()
+            .await?;
+
+        if res.status().is_success() {
+            let json_resp: serde_json::Value = res.json().await?;
+            let status = json_resp["status"].as_str().unwrap_or("unknown");
+
+            match status {
+                "succeeded" => {
+                    let output = if let Some(output_array) = json_resp["output"].as_array() {
+                        output_array.iter()
+                            .filter_map(|v| v.as_str())
+                            .collect::<Vec<&str>>()
+                            .join("")
+                    } else if let Some(output_str) = json_resp["output"].as_str() {
+                        output_str.to_string()
+                    } else {
+                        "I apologize, but I couldn't generate a response.".to_string()
+                    };
+                    return Ok(output.trim().to_string());
+                }
+                "failed" | "canceled" => {
+                    warn!("Prediction {} after {} attempts", status, attempt);
+                    break;
+                }
+                _ => continue,  // Still processing
+            }
+        }
+    }
+
+    Ok("I apologize, but the response is taking too long. Please try again.".to_string())
+}
+
+/// Fallback response when API is not available
 pub fn get_fallback_response(query: &str, context: &str) -> String {
     if context.is_empty() {
         format!(
             "I understand you're asking about: \"{}\"\n\n\
-             Unfortunately, I couldn't find specific information in my knowledge base. \
-             Please contact your local Krishi Vigyan Kendra (KVK) or dial 1551 for Kisan Call Center \
-             for personalized farming advice.",
+             Based on general farming knowledge:\n\
+             • Contact your local Krishi Vigyan Kendra (KVK) for personalized advice\n\
+             • Call 1551 (Kisan Call Center) for free 24x7 assistance\n\
+             • Visit your nearest agricultural office for soil testing and recommendations\n\n\
+             I'm currently unable to provide a detailed AI response. Please try again later.",
             query
         )
     } else {
         format!(
-            "Based on available information:\n\n{}\n\n\
-             For more detailed advice, please visit your nearest agricultural office or \
-             contact the Kisan Call Center at 1551.",
+            "Based on available information from our knowledge base:\n\n{}\n\n\
+             For more detailed and personalized advice:\n\
+             • Contact Kisan Call Center: 1551 (Free, 24x7)\n\
+             • Visit your nearest Krishi Vigyan Kendra",
             context
         )
     }
