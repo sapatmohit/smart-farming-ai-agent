@@ -1,0 +1,10 @@
+.env
+.env.local
+target/
+node_modules/
+.next/
+.DS_Store
+.vscode/
+backend/target/
+frontend/node_modules/
+frontend/.next/
