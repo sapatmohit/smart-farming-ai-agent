@@ -1,0 +1,13 @@
+{
+  "name": "smart-farming-ai-agent",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && cargo run",
+    "dev:frontend": "cd frontend && bun dev",
+    "dev": "concurrently -k -n \"BACKEND,FRONTEND\" -c \"magenta,cyan\" \"npm:dev:backend\" \"npm:dev:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

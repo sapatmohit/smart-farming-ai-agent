@@ -49,6 +49,7 @@ pub async fn retrieve(query: &str) -> (Vec<String>, Vec<String>) {
 }
 
 /// Alternative keyword-based retrieval for specific farming topics
+#[allow(dead_code)]
 pub fn retrieve_by_category(category: &str) -> Vec<Document> {
     get_all_documents()
         .into_iter()

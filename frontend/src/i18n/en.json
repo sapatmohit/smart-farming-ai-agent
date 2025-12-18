@@ -14,8 +14,11 @@
   },
   "sidebar": {
     "weather": "Live Weather",
-    "prices": "Market Prices",
-    "tips": "Quick Tips"
+    "prices": "Market Trends",
+    "tips": "Quick Tips",
+    "chat": "AI Assistant",
+    "planner": "Crop Planner",
+    "schemes": "Govt Schemes"
   },
   "common": {
     "high": "High Confidence",

@@ -48,7 +48,7 @@ pub fn detect_language(text: &str) -> String {
     }
 }
 
-/// Translation dictionary for common farming terms (Hindi <-> English)
+// Translation dictionary for common farming terms (Hindi <-> English)
 lazy_static::lazy_static! {
     static ref HINDI_TO_ENGLISH: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();

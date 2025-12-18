@@ -2,8 +2,8 @@ use axum::{Json, http::StatusCode};
 use serde::{Deserialize, Serialize};
 use tracing::{info, error};
 
-use crate::rag::retriever;
-use crate::services::{ibm_granite, translator};
+use crate::rag::{retriever, generator};
+use crate::services::translator;
 
 #[derive(Deserialize)]
 pub struct ChatRequest {
@@ -55,8 +55,8 @@ pub async fn chat_handler(
 
     info!("Retrieved {} relevant documents", sources.len());
 
-    // Step 3: Generate response using IBM Granite
-    let english_response = match ibm_granite::generate_response(&query_in_english, &context).await {
+    // Step 3: Generate response using IBM Granite (via RAG generator)
+    let english_response = match generator::generate(&query_in_english, &context).await {
         Ok(response) => response,
         Err(e) => {
             error!("IBM Granite error: {:?}", e);
