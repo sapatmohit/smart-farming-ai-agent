@@ -60,11 +60,17 @@ cd backend
 cargo run
 ```
 
-### Frontend (Next.js)
+### Frontend (Next.js with Bun)
 ```bash
 cd frontend
-npm install
-npm run dev
+bun install
+bun dev
+```
+
+### Build for Production
+```bash
+cd frontend
+bun run build
 ```
 
 ## 🔌 API Endpoints
