@@ -1,9 +1,9 @@
-use actix_web::web;
+use axum::Router;
+use axum::routing::post;
 
 pub mod chat;
 
-pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::resource("/chat").route(web::post().to(chat::chat_handler))
-    );
+pub fn router() -> Router {
+    Router::new()
+        .route("/chat", post(chat::chat_handler))
 }

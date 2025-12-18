@@ -1,0 +1,26 @@
+{
+  "app": {
+    "title": "Kisan Mitra AI",
+    "subtitle": "Your intelligent companion for smart farming decisions",
+    "language": "Language"
+  },
+  "chat": {
+    "placeholder": "Ask about crops, weather, pest control...",
+    "send": "Send",
+    "thinking": "Thinking...",
+    "error": "Sorry, I couldn't connect to the server.",
+    "welcomeTitle": "Welcome to Kisan Mitra AI! 🌾",
+    "welcomeMessage": "I can help you with:\n• Crop recommendations for your region\n• Weather-based advice\n• Pest and disease control\n• Current mandi prices\n\nAsk me anything about farming!"
+  },
+  "sidebar": {
+    "weather": "Live Weather",
+    "prices": "Market Prices",
+    "tips": "Quick Tips"
+  },
+  "common": {
+    "high": "High Confidence",
+    "medium": "Medium Confidence",
+    "low": "Low Confidence",
+    "sources": "Sources"
+  }
+}

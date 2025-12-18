@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google"; // Assuming default nextjs setup included fonts or we use system fonts if fails
+import { Inter } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Smart Farming AI Agent",
-  description: "AI Advice for Farmers using IBM Granite",
+  title: "Kisan Mitra AI | Smart Farming Assistant",
+  description: "AI-powered farming advice for Indian farmers using IBM Granite LLM. Get crop recommendations, weather-based guidance, pest control tips, and mandi prices in Hindi, Marathi, and English.",
+  keywords: ["farming", "agriculture", "AI", "India", "IBM Granite", "kisan", "mandi", "crop", "weather"],
 };
 
 export default function RootLayout({
@@ -16,7 +17,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.className} antialiased`}>{children}</body>
     </html>
   );
 }

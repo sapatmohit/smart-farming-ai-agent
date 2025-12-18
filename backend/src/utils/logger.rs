@@ -1,6 +1,7 @@
-use log::info;
+/// Logger utilities (now using tracing in main.rs)
+/// This module is kept for backward compatibility
 
 pub fn init() {
-    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
-    info!("Logger initialized");
+    // Tracing is initialized in main.rs
+    // This is a no-op for backward compatibility
 }

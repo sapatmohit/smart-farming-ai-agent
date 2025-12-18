@@ -1,35 +1,55 @@
-use actix_web::{web, App, HttpServer, HttpResponse, Responder};
-use dotenv::dotenv;
-use log::info;
+use axum::{
+    Router,
+    routing::get,
+    http::Method,
+};
+use tower_http::cors::{CorsLayer, Any};
+use tracing::info;
+use std::net::SocketAddr;
 
 mod api;
 mod rag;
 mod services;
 mod utils;
 
-async fn health_check() -> impl Responder {
-    HttpResponse::Ok().body("Smart Farming AI Agent Backend is Running 🚀")
+async fn health_check() -> &'static str {
+    "Smart Farming AI Agent Backend is Running 🚀"
 }
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    dotenv().ok();
-    utils::logger::init();
+#[tokio::main]
+async fn main() {
+    // Load environment variables
+    dotenvy::dotenv().ok();
+    
+    // Initialize tracing
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info".into())
+        )
+        .init();
 
-    let port = std::env::var("BACKEND_PORT").unwrap_or_else(|_| "8080".to_string());
-    let addr = format!("0.0.0.0:{}", port);
+    // CORS configuration
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers(Any);
 
-    info!("Starting server at http://{}", addr);
+    // Build router
+    let app = Router::new()
+        .route("/health", get(health_check))
+        .nest("/api", api::router())
+        .layer(cors);
 
-    HttpServer::new(|| {
-        App::new()
-            .route("/", web::get().to(health_check))
-            .service(
-                web::scope("/api")
-                    .configure(api::config)
-            )
-    })
-    .bind(addr)?
-    .run()
-    .await
+    // Get port from env or default
+    let port: u16 = std::env::var("BACKEND_PORT")
+        .unwrap_or_else(|_| "8080".to_string())
+        .parse()
+        .unwrap_or(8080);
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    info!("🌾 Smart Farming AI Backend starting on http://{}", addr);
+
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }

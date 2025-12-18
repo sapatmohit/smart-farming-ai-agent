@@ -1,6 +1,8 @@
-// Placeholder for Generator logic
-// This module will handle generating responses using retrieved context
+/// Generator module - orchestrates the final response generation
+/// For now, this delegates to IBM Granite. Can be extended for prompt engineering.
 
-pub async fn generate(_context: Vec<String>, _query: &str) -> String {
-    "This is a generated response based on the retrieved context.".to_string()
+use crate::services::ibm_granite;
+
+pub async fn generate(query: &str, context: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    ibm_granite::generate_response(query, context).await
 }
