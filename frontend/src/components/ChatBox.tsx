@@ -162,7 +162,7 @@ export default function ChatBox({ locale }: ChatBoxProps) {
                      }} />
                   </div>
                   
-                  {msg.role === 'bot' && (msg.confidence || msg.sources?.length > 0) && (
+                  {msg.role === 'bot' && (msg.confidence || (msg.sources && msg.sources.length > 0)) && (
                     <div className="mt-3 flex gap-2">
                        {getConfidenceBadge(msg.confidence)}
                     </div>
