@@ -9,6 +9,7 @@ use crate::services::translator;
 pub struct ChatRequest {
     pub query: String,
     pub language: Option<String>, // "en", "hi", "mr"
+    pub image: Option<String>,    // Base64 encoded image or URL
 }
 
 #[derive(Serialize)]
@@ -56,7 +57,7 @@ pub async fn chat_handler(
     info!("Retrieved {} relevant documents", sources.len());
 
     // Step 3: Generate response using IBM Granite (via RAG generator)
-    let english_response = match generator::generate(&query_in_english, &context).await {
+    let english_response = match generator::generate(&query_in_english, &context, payload.image).await {
         Ok(response) => response,
         Err(e) => {
             error!("IBM Granite error: {:?}", e);

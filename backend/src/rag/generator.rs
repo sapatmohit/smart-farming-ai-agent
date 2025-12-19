@@ -3,6 +3,6 @@
 
 use crate::services::ibm_granite;
 
-pub async fn generate(query: &str, context: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    ibm_granite::generate_response(query, context).await
+pub async fn generate(query: &str, context: &str, image: Option<String>) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    ibm_granite::generate_response(query, context, image).await
 }

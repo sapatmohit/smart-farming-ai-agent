@@ -3,6 +3,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:808
 export interface ChatRequest {
   query: string;
   language: string;
+  image?: string | null;
 }
 
 export interface ChatResponse {

@@ -21,6 +21,8 @@ export default function ChatBox({ locale }: ChatBoxProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Show welcome message on first load
   useEffect(() => {
@@ -38,18 +40,39 @@ export default function ChatBox({ locale }: ChatBoxProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-    const userMsg: Message = { role: 'user', content: input };
+  const sendMessage = async () => {
+    if ((!input.trim() && !selectedImage) || loading) return;
+
+    const userMsg: Message = { 
+      role: 'user', 
+      content: input || (selectedImage ? '📷 [Image Uploaded]' : '') 
+    };
+    
+    // Optimistic update
     setMessages((prev) => [...prev, userMsg]);
+    const currentInput = input;
+    const currentImage = selectedImage;
+    
     setInput('');
+    setSelectedImage(null);
     setLoading(true);
 
     try {
       const response: ChatResponse = await sendChatMessage({
-        query: input,
+        query: currentInput || (currentImage ? "Analyze this image" : ""),
         language: locale,
+        image: currentImage
       });
       
       setMessages((prev) => [...prev, {
@@ -188,6 +211,24 @@ export default function ChatBox({ locale }: ChatBoxProps) {
       {/* Input Area */}
       <div className="p-4 lg:p-0 mt-auto">
          <div className="relative group max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 focus-within:shadow-md focus-within:border-green-500/50 transition-all p-2">
+            {selectedImage && (
+              <div className="mx-4 mt-4 mb-2 relative w-fit">
+                <img src={selectedImage} alt="Selected" className="h-20 rounded-lg border border-slate-200 shadow-sm" />
+                <button 
+                  onClick={() => setSelectedImage(null)}
+                  className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 hover:bg-rose-600 shadow-md"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            )}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*" 
+              onChange={handleImageSelect} 
+            />
             <input
               type="text"
               value={input}
@@ -199,7 +240,10 @@ export default function ChatBox({ locale }: ChatBoxProps) {
             />
             <div className="flex justify-between items-center px-2 pb-1 mt-2">
                <div className="flex gap-2">
-                  <button className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-green-600 transition-colors">
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`p-2 rounded-lg transition-colors ${selectedImage ? 'text-green-600 bg-green-50' : 'text-slate-400 hover:bg-slate-50 hover:text-green-600'}`}
+                  >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                   </button>
                   <button className="p-2 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-green-600 transition-colors">
@@ -213,7 +257,7 @@ export default function ChatBox({ locale }: ChatBoxProps) {
                   </div>
                   <button 
                     onClick={sendMessage} 
-                    disabled={!input.trim()}
+                    disabled={!input.trim() && !selectedImage}
                     className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-green-700 transition-colors shadow-sm"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" /></svg>

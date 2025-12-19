@@ -6,57 +6,87 @@ use tracing::{info, error, warn};
 /// IBM Granite LLM integration via Replicate API
 /// Uses Replicate's hosted IBM Granite models for text generation
 
-const SYSTEM_PROMPT: &str = r#"You are an expert agricultural advisor helping Indian farmers with accurate, localized, and practical advice.
+const SYSTEM_PROMPT: &str = r#"You are KisanAI, a helpful and knowledgeable AI assistant.
 
-RULES:
-1. Never hallucinate or make up data - only use information from the provided context
-2. Prefer government and trusted agricultural sources (ICAR, IMD, State Agriculture Departments)
-3. Explain in simple, farmer-friendly language that villagers can understand
-4. Provide actionable steps that farmers can immediately implement
-5. If you don't have enough information, admit it and suggest where to find help
-6. Always consider the Indian agricultural context (seasons, local crops, mandi system)
-7. Be helpful, respectful, and supportive
+Your primary goal is to help users with accurate and practical information. While you have a special focus on agriculture and helping farmers, you can answer questions on a wide range of topics including general knowledge, science, history, and daily life.
+
+GUIDELINES:
+1. **Be Helpful & Accurate**: Provide clear, correct, and useful answers.
+2. **Context Matters**: Use the provided context from the knowledge base to answer properly. If the context is relevant, prioritize it.
+3. **General Knowledge**: If the query is not about farming, answer it using your general knowledge.
+4. **Farming Persona**: When answering agricultural questions, use simple, farmer-friendly language and consider the Indian context (seasons, mandis, crops).
+5. **Safety**: Do not generate harmful, illegal, or biased content.
 
 FORMAT:
-- Use simple bullet points for steps
-- Include specific quantities and timings when available
-- Mention local names of crops/pests when relevant"#;
+- Use bullet points for lists.
+- Be concise and direct.
+- For farming advice, include actionable steps."#;
 
 const REPLICATE_API_URL: &str = "https://api.replicate.com/v1/predictions";
 
-pub async fn generate_response(query: &str, context: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn generate_response(query: &str, context: &str, image: Option<String>) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     let api_token = env::var("REPLICATE_API_TOKEN").map_err(|_| "REPLICATE_API_TOKEN not set")?;
-    
-    // Use IBM Granite 3.0 8B Instruct model on Replicate
-    let model_version = env::var("REPLICATE_MODEL_VERSION")
-        .unwrap_or_else(|_| "ibm-granite/granite-3.0-8b-instruct".to_string());
 
-    let client = Client::new();
-
-    // Build the prompt with context
-    let user_prompt = if context.is_empty() {
-        format!("Farmer's Question: {}\n\nPlease provide helpful farming advice based on your knowledge.", query)
+    // Determine model based on image presence
+    let (model_version, is_vision) = if image.is_some() {
+        // Use a vision-capable model (e.g., LLaVA or newer Granite Vision if available)
+        // Using LLaVA v1.6 Mistral 7B standard version for robustness
+        (
+            env::var("REPLICATE_VISION_MODEL").unwrap_or_else(|_| "yorickvp/llava-13b:b5f6212d2d740c28fbb5478fb01693df32d0c22822a93866917f5f84d2621a5b".to_string()),
+            true
+        )
     } else {
-        format!(
-            "CONTEXT FROM KNOWLEDGE BASE:\n{}\n\n---\n\nFarmer's Question: {}\n\nBased on the context above, please provide accurate and helpful farming advice.",
-            context, query
+        // Default text-only model
+        (
+            env::var("REPLICATE_MODEL_VERSION").unwrap_or_else(|_| "ibm-granite/granite-3.0-8b-instruct".to_string()),
+            false
         )
     };
 
-    let full_prompt = format!("{}\n\nUser: {}\nAssistant:", SYSTEM_PROMPT, user_prompt);
+    let client = Client::new();
 
-    info!("Calling Replicate API with IBM Granite model");
+    // Prepare prompt
+    let user_suffix = if is_vision { "" } else { "User: " };
+    let assistant_prefix = if is_vision { "" } else { "Assistant:" };
+    
+    // RAG Context Integration
+    let context_block = if context.is_empty() {
+        String::new()
+    } else {
+        format!("CONTEXT FROM KNOWLEDGE BASE:\n{}\n\n---\n\n", context)
+    };
 
-    // Create prediction request
+    // Prompt construction depends on model expectations, but we generally mix system prompt + context + query
+    let final_prompt = if is_vision {
+        // LLaVA usually takes a single prompt string
+        format!("{}\n\n{}{}", SYSTEM_PROMPT, context_block, query)
+    } else {
+        // Granite Instruct format
+        let user_msg = format!("{}{}", context_block, query);
+        format!("{}\n\n{}{}\n{}", SYSTEM_PROMPT, user_suffix, user_msg, assistant_prefix)
+    };
+
+    info!("Calling Replicate API with model: {} (Vision: {})", model_version, is_vision);
+
+    // Build Payload
+    let mut input_obj = serde_json::Map::new();
+    input_obj.insert("prompt".to_string(), json!(final_prompt));
+    input_obj.insert("max_tokens".to_string(), json!(500));
+    input_obj.insert("temperature".to_string(), json!(0.7));
+    input_obj.insert("top_p".to_string(), json!(0.9));
+    
+    if let Some(img_data) = image {
+        input_obj.insert("image".to_string(), json!(img_data));
+    }
+
+    // Granite specific params
+    if !is_vision {
+         input_obj.insert("stop_sequences".to_string(), json!("User:,\n\nUser"));
+    }
+
     let body = json!({
         "version": model_version,
-        "input": {
-            "prompt": full_prompt,
-            "max_tokens": 500,
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "stop_sequences": "User:,\n\nUser"
-        }
+        "input": input_obj
     });
 
     let res = client.post(REPLICATE_API_URL)
