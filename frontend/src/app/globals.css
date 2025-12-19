@@ -1,79 +1,122 @@
 @import "tailwindcss";
 
 :root {
-  --primary: #15803d;
-  --primary-light: #dcfce7;
-  --secondary: #f59e0b;
-  --background: #f8fafc;
-  --card-bg: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(255, 255, 255, 0.4);
+  /* KisanAI Minimal Texture */
+  --primary: #22c55e;
+  --bg-gradient: radial-gradient(circle at 50% 0%, #f0fdf4 0%, #ffffff 60%, #ffffff 100%);
+  --orb-gradient: radial-gradient(circle at center, #4ade80 0%, #16a34a 100%);
 }
 
 body {
-  background-color: var(--background);
-  color: #1e293b;
+  background: var(--bg-gradient);
+  color: #0f172a;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
-/* Glassmorphism Utilities */
-.glass {
-  background: var(--card-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+/* Minimalist Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
+
+.input-bar {
+  background: white;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+}
+
+.suggestion-card {
+  background: white;
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.suggestion-card:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
 
 .glass-dark {
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+/* Enhanced Animations */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0,0,0,0.02);
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 10px;
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Typography & Components */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.03em;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
-}
-
-/* Typography Enhancements */
-h1, h2, h3 {
-  letter-spacing: -0.025em;
-}
-
-/* Custom Components Base */
 .nav-item {
-  @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer;
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 cursor-pointer font-medium;
 }
 
 .nav-item-active {
-  @apply bg-green-600 text-white shadow-lg shadow-green-200 scale-[1.02];
+  @apply bg-green-600 text-white shadow-lg shadow-green-600/20 scale-[1.02];
 }
 
 .nav-item-inactive {
-  @apply text-slate-600 hover:bg-slate-100;
+  @apply text-slate-600 hover:bg-white/50 hover:text-green-700 hover:translate-x-1;
 }
 
 .card-hover {
-  @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+  @apply hover:-translate-y-1 hover:shadow-xl hover:shadow-green-900/5;
+}
+
+.btn-primary {
+  @apply px-4 py-2 bg-green-600 text-white rounded-xl font-medium shadow-lg shadow-green-600/20 
+  hover:bg-green-700 hover:scale-[1.02] active:scale-95 transition-all duration-200;
+}
+
+.btn-glass {
+  @apply px-4 py-2 bg-white/50 backdrop-blur-sm border border-white/60 text-slate-700 rounded-xl font-medium
+  hover:bg-white/80 hover:scale-[1.02] active:scale-95 transition-all duration-200;
 }
