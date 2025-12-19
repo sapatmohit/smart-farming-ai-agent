@@ -1,7 +1,7 @@
 'use client';
 
 import { getTranslations, Locale } from '@/i18n';
-import { ChatResponse, sendChatMessage } from '@/lib/api';
+import { ChatResponse, sendChatMessage, translateText } from '@/lib/api';
 import { useEffect, useRef, useState } from 'react';
 
 interface Message {
@@ -23,6 +23,7 @@ export default function ChatBox({ locale }: ChatBoxProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const prevLocaleRef = useRef<Locale>(locale);
 
   // Show welcome message on first load
   useEffect(() => {
@@ -33,7 +34,68 @@ export default function ChatBox({ locale }: ChatBoxProps) {
         confidence: 'high'
       }]);
     }
-  }, [locale]);
+  }, []); // Run once on mount
+
+  // Handle Locale Change - Translate History
+  useEffect(() => {
+    const translateHistory = async () => {
+      if (prevLocaleRef.current === locale || messages.length === 0) return;
+      
+      const targetLang = locale === 'hi' ? 'hi' : locale === 'mr' ? 'mr' : 'en';
+      
+      // Update welcome message immediately
+      const newWelcome = {
+         role: 'bot' as const,
+         content: `**${t.chat.welcomeTitle}**\n\n${t.chat.welcomeMessage}`,
+         confidence: 'high' as const
+      };
+
+      // Create a copy to translate
+      const messagesToTranslate = messages.slice(1); // Skip welcome message
+      if (messagesToTranslate.length === 0) {
+         setMessages([newWelcome]);
+         prevLocaleRef.current = locale;
+         return;
+      }
+
+      setLoading(true); // Show loading state during translation
+
+      try {
+        const translatedMessages = await Promise.all(
+          messagesToTranslate.map(async (msg) => {
+            // Skip images or empty content
+            if (msg.role === 'user' && (msg.content.includes('[Image Uploaded]') || !msg.content.trim())) {
+                return msg;
+            }
+            
+            try {
+              const res = await translateText({
+                text: msg.content,
+                target_lang: targetLang
+              });
+              // Verify we got a valid translation
+              if (res.translated_text && res.translated_text.trim()) {
+                  return { ...msg, content: res.translated_text };
+              }
+              return msg;
+            } catch (e) {
+              console.warn("Retaining original message due to translation error:", e);
+              return msg; // Keep original on error
+            }
+          })
+        );
+        
+        setMessages([newWelcome, ...translatedMessages]);
+      } catch (error) {
+        console.error("Translation failed", error);
+      } finally {
+        setLoading(false);
+        prevLocaleRef.current = locale;
+      }
+    };
+
+    translateHistory();
+  }, [locale, t.chat.welcomeTitle, t.chat.welcomeMessage]); // Re-run when locale changes
 
   // Auto-scroll to bottom
   useEffect(() => {

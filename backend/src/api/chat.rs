@@ -57,7 +57,8 @@ pub async fn chat_handler(
     info!("Retrieved {} relevant documents", sources.len());
 
     // Step 3: Generate response using IBM Granite (via RAG generator)
-    let english_response = match generator::generate(&query_in_english, &context, payload.image).await {
+    // We pass the desired language directly to the LLM
+    let final_response = match generator::generate(&query_in_english, &context, payload.image, &user_lang).await {
         Ok(response) => response,
         Err(e) => {
             error!("IBM Granite error: {:?}", e);
@@ -68,14 +69,7 @@ pub async fn chat_handler(
         }
     };
 
-    // Step 4: Translate response back to user's language if needed
-    let final_response = if user_lang != "en" && user_lang != detected_lang {
-        translator::translate_from_english(&english_response, &user_lang)
-    } else if detected_lang != "en" {
-        translator::translate_from_english(&english_response, &detected_lang)
-    } else {
-        english_response
-    };
+    // Step 4: No post-translation needed, LLM generates in target language directly
 
     // Step 5: Calculate confidence based on context matches
     let confidence = if sources.len() >= 3 {

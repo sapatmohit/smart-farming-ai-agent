@@ -42,3 +42,28 @@ export async function checkHealth(): Promise<boolean> {
     return false;
   }
 }
+
+export interface TranslateRequest {
+  text: string;
+  target_lang: string;
+}
+
+export interface TranslateResponse {
+  translated_text: string;
+}
+
+export async function translateText(request: TranslateRequest): Promise<TranslateResponse> {
+  const res = await fetch(`${BACKEND_URL}/api/translate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Translation failed: ${res.status}`);
+  }
+
+  return res.json();
+}
